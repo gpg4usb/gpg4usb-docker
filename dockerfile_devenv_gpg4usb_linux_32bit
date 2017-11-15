@@ -1,0 +1,119 @@
+FROM i386/debian:wheezy-slim 
+
+##########################################
+# Set used versions and directories
+##########################################
+ARG gnupg_version=1.4.22
+ARG qt_version=4.8.7
+ARG libgpg_error_version=1.27
+ARG gpgme_version=1.2.0
+ARG prefix=/opt/build
+ARG src=/opt/src
+
+##########################################
+# install latest patches
+##########################################
+RUN apt-get update -y
+RUN apt-get upgrade -y
+
+##########################################
+# Install needed packages
+##########################################
+RUN apt-get install -y git wget bzip2 build-essential zip
+
+##########################################
+# Download needed sources
+##########################################
+WORKDIR /opt
+RUN wget http://download.qt.io/official_releases/qt/4.8/${qt_version}/qt-everywhere-opensource-src-${qt_version}.tar.gz
+RUN wget ftp://ftp.gnupg.org/gcrypt/gnupg/gnupg-${gnupg_version}.tar.bz2 
+RUN wget ftp://ftp.gnupg.org/gcrypt/libgpg-error/libgpg-error-${libgpg_error_version}.tar.bz2 
+RUN wget https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-${gpgme_version}.tar.bz2
+
+
+##########################################
+# Extract needed sources
+##########################################
+RUN mkdir ${src}
+RUN for i in *.tar.*; do tar xf $i -C ${src}; done
+
+##########################################
+# Compile qt
+##########################################
+# avoid error when compiling qt by installing libext-dev: Basic XLib functionality test failed!
+RUN apt-get install -y libxext-dev
+RUN cd ${src}/qt-everywhere-opensource-src-${qt_version} && \
+    ./configure -no-xrandr -no-xinerama -no-glib -no-sm -no-webkit -qt-zlib -qt-libpng -no-qt3support \ 
+        -no-phonon -no-phonon-backend -no-gtkstyle -static -nomake examples -nomake demos -nomake docs \
+	-opensource -prefix ${prefix} -platform linux-g++-32 -no-exceptions -qt-libjpeg -silent -confirm-license \
+    && make \
+    && make install
+
+##########################################
+# Compile GnuPG
+##########################################
+RUN export CFLAGS="-static" && \
+    export CXXFLAGS="-static" && \
+    unset LC_ALL && \
+    cd ${src}/gnupg-${gnupg_version} && \
+    ./configure --prefix=${prefix} --silent && \
+    make 
+
+##########################################
+# Compile libgpg-error
+##########################################
+RUN export CFLAGS="-static" && \
+    export CXXFLAGS="-static" && \
+    unset LC_ALL && \
+    cd ${src}/libgpg-error-${libgpg_error_version} && \
+    ./configure --prefix=${prefix} --enable-static --silent && \
+    make && \
+    make install
+
+##########################################
+# Compile gpgme
+##########################################
+RUN export CFLAGS="-static" && \
+    export CXXFLAGS="-static" && \
+    export LDFLAGS="-s -static" && \
+    unset LC_ALL && \
+    cd ${src}/gpgme-${gpgme_version} && \
+    ./configure --enable-static --prefix=${prefix} --silent \
+    --with-gpg-error-prefix=${prefix} --without-gpgsm --without-gpgconf --without-libassuan && \
+    make && \
+    make install 
+
+##########################################
+# Clone the gpg4usb git-repository 
+##########################################
+RUN git clone https://github.com/gpg4usb/gpg4usb.git /opt/gpg4usb.git
+RUN cd /opt/gpg4usb.git && git pull
+
+##########################################
+# Compile gpg4usb statically
+##########################################
+WORKDIR /opt/gpg4usb.git
+
+RUN ${prefix}/bin/qmake -spec ${prefix}/mkspecs/linux-g++-32 "TARGET=start_linux" "INCLUDEPATH += ${prefix}/include" \
+        "LIBS +=${prefix}/lib/libgpgme.a ${prefix}/lib/libgpg-error.a -L${prefix}/lib -static-libgcc" \
+	"DEFINES += STATICLINUX" "QMAKE_INCDIR_QT = ${prefix}/include" "QMAKE_LIBDIR_QT = ${prefix}/lib" \
+	"QMAKE_QMAKE = ${prefix}/bin/qmake" "QMAKE_MOC = ${prefix}/bin/moc" "QMAKE_UIC = ${prefix}/bin/uic" \
+	"QMAKE_RCC = ${prefix}/bin/rcc" "$@"
+RUN make
+
+##########################################
+# Create current gpg4usb-zip
+##########################################
+#RUN mkdir /opt/gpg4usb
+#RUN cp -r /opt/gpg4usb.git/release/* /opt/gpg4usb/
+#RUN rm -f /opt/gpg4usb/bin/*
+#RUN rm -f /opt/gpg4usb/gpg4usb.app
+#RUN cp /opt/linbuild/gnupg-${gnupg_version}/g10/gpg /opt/gpg4usb/bin
+#RUN cd /opt && zip -r /opt/gpg4usb_daily.zip gpg4usb
+#RUN unzip -l /opt/gpg4usb_daily.zip
+
+##########################################
+# Cleanup
+##########################################
+RUN apt-get clean
+RUN rm -rf ${src}
