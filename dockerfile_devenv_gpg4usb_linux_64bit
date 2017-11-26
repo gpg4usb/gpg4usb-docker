@@ -45,9 +45,9 @@ RUN apt-get install -y libxext-dev
 RUN cd ${src}/qt-everywhere-opensource-src-${qt_version} && \
     ./configure -no-xrandr -no-xinerama -no-glib -no-sm -no-webkit -qt-zlib -qt-libpng -no-qt3support \ 
         -no-phonon -no-phonon-backend -no-gtkstyle -static -nomake examples -nomake demos -nomake docs \
-	-opensource -prefix ${prefix} -platform linux-g++-64 -no-exceptions -qt-libjpeg -silent -confirm-license \
-    && make \
-    && make install
+	-opensource -prefix ${prefix} -platform linux-g++-64 -no-exceptions -qt-libjpeg -silent -confirm-license && \
+    make && \
+    make install
 
 ##########################################
 # Compile GnuPG
@@ -57,7 +57,8 @@ RUN export CFLAGS="-static" && \
     unset LC_ALL && \
     cd ${src}/gnupg-${gnupg_version} && \
     ./configure --prefix=${prefix} --silent && \
-    make 
+    make && \
+    make install
 
 ##########################################
 # Compile libgpg-error
@@ -102,18 +103,19 @@ RUN ${prefix}/bin/qmake -spec ${prefix}/mkspecs/linux-g++-64 "TARGET=start_linux
 RUN make
 
 ##########################################
-# Create current gpg4usb-zip
-##########################################
-#RUN mkdir /opt/gpg4usb
-#RUN cp -r /opt/gpg4usb.git/release/* /opt/gpg4usb/
-#RUN rm -f /opt/gpg4usb/bin/*
-#RUN rm -f /opt/gpg4usb/gpg4usb.app
-#RUN cp /opt/linbuild/gnupg-${gnupg_version}/g10/gpg /opt/gpg4usb/bin
-#RUN cd /opt && zip -r /opt/gpg4usb_daily.zip gpg4usb
-#RUN unzip -l /opt/gpg4usb_daily.zip
-
-##########################################
 # Cleanup
 ##########################################
-RUN apt-get clean
-RUN rm -rf ${src}
+#RUN apt-get clean
+#RUN rm -rf ${src}
+
+##########################################
+# Create current gpg4usb-zip
+##########################################
+RUN mkdir /opt/gpg4usb
+RUN cp -r /opt/gpg4usb.git/release/* /opt/gpg4usb/
+RUN rm -f /opt/gpg4usb/bin/*
+RUN rm -f /opt/gpg4usb/gpg4usb.app
+RUN cp /opt/build/bin/gpg /opt/gpg4usb/bin
+RUN cd /opt && zip -r /opt/gpg4usb_daily.zip gpg4usb
+RUN unzip -l /opt/gpg4usb_daily.zip
+
