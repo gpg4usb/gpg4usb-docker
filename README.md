@@ -3,7 +3,7 @@ Dockerfiles and script for creating gpg4usb build environment.
 
 ## Howto build
 
-1) Install [Docker CE](https://docs.docker.com/engine/installation/)
+1) Be sure to have [Docker CE](https://docs.docker.com/engine/installation/) installed
 2) Run the following commands
 ```
 git clone git@github.com:gpg4usb/gpg4usb-docker.git
